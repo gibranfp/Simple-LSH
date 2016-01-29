@@ -113,12 +113,12 @@ class LSH:
         """
         la.listdb_print(self.ldb)
 
-    def mine(self,tuple_size,num_tuples,table_size=2**19):
+    def mine(self,tuple_size,num_tuples,max_value,table_size=2**19):
         """
         Mines co-occurring items from a database of lists using Sampled LSH
         """
 
-        ldb=la.sampledmh_l1mine(self.ldb,tuple_size,num_tuples,max_value,table_size)
+        ldb=la.sampledlsh_l1mine(self.ldb,tuple_size,num_tuples,max_value,table_size)
             
         return LSH(ldb=ldb)
 

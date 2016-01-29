@@ -28,47 +28,47 @@ typedef struct RandomValue
      double random_double;
 } RandomValue;
 
-typedef struct Bucket{
+typedef struct BucketMH {
      ullong hash_value;
      List items;
-} Bucket;
+} BucketMH;
 
-typedef struct HashTable {
+typedef struct HashTableMH {
 	uint table_size; 
 	uint tuple_size; 
 	uint dim;
 	RandomValue *permutations;
-	Bucket *buckets;
+	BucketMH *buckets;
 	List used_buckets;
 	uint *a;
    uint *b;
    double *weights;
-} HashTable;
+} HashTableMH;
 
-typedef struct HashIndex {
+typedef struct HashIndexMH {
 	uint number_of_tables;
-	HashTable *hash_tables;
-} HashIndex;
+	HashTableMH *hash_tables;
+} HashIndexMH;
 
 /************************ Function prototypes ************************/
-void mh_print_head(HashTable *);
-void mh_print_table(HashTable *);
+void mh_print_head(HashTableMH *);
+void mh_print_table(HashTableMH *);
 void mh_rng_init(unsigned long long);
-void mh_init(HashTable *);
-HashTable mh_create(uint, uint, uint);
-void mh_destroy(HashTable *);
-void mh_erase_from_list(List *, HashTable *);
-void mh_erase_from_index(uint, HashTable *);
-void mh_clear_table(HashTable *);
-void mh_destroy(HashTable *);
+void mh_init(HashTableMH *);
+HashTableMH mh_create(uint, uint, uint);
+void mh_destroy(HashTableMH *);
+void mh_erase_from_list(List *, HashTableMH *);
+void mh_erase_from_index(uint, HashTableMH *);
+void mh_clear_table(HashTableMH *);
+void mh_destroy(HashTableMH *);
 void mh_generate_permutations(uint, uint, RandomValue *);
 void mh_weight_permutations(uint, uint, RandomValue *, double *);
 int mh_random_value_compare(const void *, const void *);
 ullong mh_compute_minhash(List *, RandomValue *);
-void mh_univhash(List *, HashTable *, uint *, uint *);
-uint mh_get_index(List *, HashTable *);
-uint mh_store_list(List *, uint, HashTable *);
-void mh_store_listdb(ListDB *, HashTable *, uint *);
+void mh_univhash(List *, HashTableMH *, uint *, uint *);
+uint mh_get_index(List *, HashTableMH *);
+uint mh_store_list(List *, uint, HashTableMH *);
+void mh_store_listdb(ListDB *, HashTableMH *, uint *);
 uint *mh_get_cumulative_frequency(ListDB *, ListDB *);
 ListDB mh_expand_listdb(ListDB *, uint *);
 double *mh_expand_weights(uint, uint *, double *);

@@ -33,7 +33,7 @@
  *
  * @param hash_table Hash table structure
  */
-void mh_print_head(HashTable *hash_table)
+void mh_print_head(HashTableMH *hash_table)
 {
      uint i;
 
@@ -62,7 +62,7 @@ void mh_print_head(HashTable *hash_table)
  *
  * @param hash_table Hash table structure
  */
-void mh_print_table(HashTable *hash_table)
+void mh_print_table(HashTableMH *hash_table)
 {
      uint i;
      
@@ -78,7 +78,7 @@ void mh_print_table(HashTable *hash_table)
  *
  * @param hash_table Hash table structure
  */
-void mh_init(HashTable *hash_table)
+void mh_init(HashTableMH *hash_table)
 {
      hash_table->table_size = 0;
      hash_table->tuple_size = 0; 
@@ -108,17 +108,17 @@ void mh_rng_init(unsigned long long seed)
  *
  * @return Hash table structure
  */
-HashTable mh_create(uint table_size, uint tuple_size, uint dim)
+HashTableMH mh_create(uint table_size, uint tuple_size, uint dim)
 {
      uint i;
-     HashTable hash_table;
+     HashTableMH hash_table;
 
      hash_table.table_size = table_size;
      hash_table.tuple_size = tuple_size; 
      hash_table.dim = dim; 
      hash_table.permutations = (RandomValue *) malloc(tuple_size * dim * sizeof(RandomValue)); 
     
-     hash_table.buckets = (Bucket *) calloc(table_size, sizeof(Bucket));
+     hash_table.buckets = (BucketMH *) calloc(table_size, sizeof(BucketMH));
      list_init(&hash_table.used_buckets);
 
      // generates array of random values for universal hashing
@@ -138,7 +138,7 @@ HashTable mh_create(uint table_size, uint tuple_size, uint dim)
  * @param list List to be removed
  * @param hash_table Hash table structure
  */
-void mh_erase_from_list(List *list, HashTable *hash_table)
+void mh_erase_from_list(List *list, HashTableMH *hash_table)
 {  
      uint index = mh_get_index(list, hash_table);
      list_destroy(&hash_table->buckets[index].items);
@@ -156,7 +156,7 @@ void mh_erase_from_list(List *list, HashTable *hash_table)
  * @param index Index of the bucket to be removed
  * @param hash_table Hash table structure
  */
-void mh_erase_from_index(uint index, HashTable *hash_table)
+void mh_erase_from_index(uint index, HashTableMH *hash_table)
 {  
      if (index >= 0 && index < hash_table->table_size){
           // destroy bucket
@@ -178,7 +178,7 @@ void mh_erase_from_index(uint index, HashTable *hash_table)
  *
  * @param hash_table Hash table structure
  */
-void mh_clear_table(HashTable *hash_table)
+void mh_clear_table(HashTableMH *hash_table)
 {  
      uint i;
 
@@ -196,7 +196,7 @@ void mh_clear_table(HashTable *hash_table)
  *
  * @param hash_table Hash table structure
  */
-void mh_destroy(HashTable *hash_table)
+void mh_destroy(HashTableMH *hash_table)
 {
      free(hash_table->permutations);
      free(hash_table->buckets);
@@ -286,7 +286,7 @@ ullong mh_compute_minhash(List *list, RandomValue *permutations)
  * @param hash_value Hash value
  * @param index Table index
  */
-void mh_univhash(List *list, HashTable *hash_table, uint *hash_value, uint *index)
+void mh_univhash(List *list, HashTableMH *hash_table, uint *hash_value, uint *index)
 {
      uint i;
      ullong minhash;
@@ -315,7 +315,7 @@ void mh_univhash(List *list, HashTable *hash_table, uint *hash_value, uint *inde
  *
  * @return - index of the hash table
  */ 
-uint mh_get_index(List *list, HashTable *hash_table)
+uint mh_get_index(List *list, HashTableMH *hash_table)
 {
      uint checked_buckets, index, hash_value;
      
@@ -354,7 +354,7 @@ uint mh_get_index(List *list, HashTable *hash_table)
  * @param id ID of the list
  * @param hash_table Hash table
  */ 
-uint mh_store_list(List *list, uint id, HashTable *hash_table)
+uint mh_store_list(List *list, uint id, HashTableMH *hash_table)
 {
      uint index;
    
@@ -380,7 +380,7 @@ uint mh_store_list(List *list, uint id, HashTable *hash_table)
  * @param hash_table Hash table
  * @param indices Indices of the used buckets
  */ 
-void mh_store_listdb(ListDB *listdb, HashTable *hash_table, uint *indices)
+void mh_store_listdb(ListDB *listdb, HashTableMH *hash_table, uint *indices)
 {
      uint i;   
          

@@ -117,7 +117,7 @@ ListDB mhlink_cluster(ListDB *listdb, uint tuple_size, uint number_of_tuples, ui
      uint *checked = (uint *) calloc(listdb->size, sizeof(uint));
      uint *clus_table = (uint *) malloc(listdb->size * sizeof(uint));
      uint *indices = (uint *) malloc(listdb->size * sizeof(uint));
-     HashTable hash_table = mh_create(table_size, tuple_size, listdb->dim);
+     HashTableMH hash_table = mh_create(table_size, tuple_size, listdb->dim);
      ListDB clusters;
      listdb_init(&clusters);
 
@@ -184,7 +184,7 @@ ListDB mhlink_cluster_weighted(ListDB *listdb, uint tuple_size, uint number_of_t
      uint *checked = (uint *) calloc(listdb->size, sizeof(uint));
      uint *clus_table = (uint *) malloc(listdb->size * sizeof(uint));
      uint *indices = (uint *) malloc(listdb->size * sizeof(uint));
-     HashTable hash_table = mh_create(table_size, tuple_size, listdb->dim);
+     HashTableMH hash_table = mh_create(table_size, tuple_size, listdb->dim);
      ListDB clusters;
      listdb_init(&clusters);
 
