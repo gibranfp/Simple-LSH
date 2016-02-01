@@ -21,8 +21,11 @@
 #define  SAMPLEDLSH_H
 
 #include "l1lsh.h"
+#include "lplsh.h"
 
-void sampledlsh_get_coitems(ListDB *, HashTable *);
+void sampledlsh_l1_get_coitems(ListDB *, HashTableL1 *);
 ListDB sampledlsh_l1mine(ListDB *, uint, uint, uint, uint);
+void sampledlsh_lp_get_coitems(ListDB *, HashTableLP *);
+ListDB sampledlsh_lpmine(VectorDB *, uint, uint, double, uint, double (*ps_dist)(void));
 
 #endif

@@ -1,5 +1,5 @@
 /**
- * @file lsh.c
+ * @file lplsh.c
  * @author Gibran Fuentes-Pineda <gibranfp@unam.mx>
  * @date 2016
  *
@@ -20,28 +20,87 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <float.h>
 #include "mt64.h"
-#include "l1lsh.h"
+#include "lplsh.h"
+
+/**
+ * @Brief Generates normally distributed numbers using the Box-Muller transform
+ *
+ */
+double lplsh_rng_gaussian()
+{
+     double u1, u2;
+
+     do {
+          u1 = genrand64_real3();
+          u2 = genrand64_real3();
+     } while (u1 <= DBL_MIN);
+          
+
+     return sqrt(-2.0 * log(u1)) * cos(2.0 * M_PI * u2);
+}
+
+/**
+ * @Brief Generates Cauchy distributed numbers from the ratio of 2 normally distributed numbers
+ *        (ratio distribution).
+ */
+double lplsh_rng_cauchy()
+{
+     double a, b;
+
+     a = lplsh_rng_gaussian();
+     b = lplsh_rng_gaussian();
+
+     if (fabs(b) < 0.0000001) {
+          b = 0.0000001;
+     }
+
+     return a / b;
+}
+
+/**
+ * @Brief Generates uniformly distributed real numbers.
+ */
+double lplsh_rng_unif(double start, double end)
+{
+     double u1 = genrand64_real3() * (end - start) + start;
+}
 
 /**
  * @Brief Prints head of a hash table structure
  *
  * @param hash_table Hash table structure
  */
-void l1lsh_print_head(HashTableL1 *hash_table)
+void lplsh_print_head(HashTableLP *hash_table)
 {
-     uint i;
+     uint i, j;
 
      printf("========== Hash table =========\n");
      printf("Table size: %d\n"
             "Sketch size: %d\n"
-            "Max feature value: %d\n"
+            "Width: %lf\n"
             "Dimensionality: %d\n"
             "Used buckets: ",
             hash_table->table_size, 
             hash_table->tuple_size,
-            hash_table->max_value,
-            hash_table->dim); 
+            hash_table->width,
+            hash_table->dim);
+
+     printf("avec: [");
+     for (i = 0; i < hash_table->tuple_size; i++){
+          printf("avec: [");
+          for (j = 0; j < hash_table->dim; j++)
+               printf("%lf ", hash_table->avec[i * hash_table->dim + j]);
+          printf("]\n");
+     }
+     printf("]\n");
+     
+     printf("bval: [");
+     for (i = 0; i < hash_table->tuple_size; i++)
+          printf("%lf ", hash_table->bval[i]);
+     printf("]\n");
+     
      list_print(&hash_table->used_buckets);
 
      printf("a: ");
@@ -60,7 +119,7 @@ void l1lsh_print_head(HashTableL1 *hash_table)
  *
  * @param hash_table Hash table structure
  */
-void l1lsh_print_table(HashTableL1 *hash_table)
+void lplsh_print_table(HashTableLP *hash_table)
 {
      uint i;
      
@@ -71,17 +130,18 @@ void l1lsh_print_table(HashTableL1 *hash_table)
 }
 
 /**
- * @brief Initializes a hash table structure for performing L1LSH.
+ * @brief Initializes a hash table structure for performing LPLSH.
  *
  * @param hash_table Hash table structure
  */
-void l1lsh_init(HashTableL1 *hash_table)
+void lplsh_init(HashTableLP *hash_table)
 {
      hash_table->table_size = 0;
      hash_table->tuple_size = 0; 
      hash_table->dim = 0; 
-     hash_table->sample_bits  = NULL;
-     hash_table->number_of_samples  = NULL;
+     hash_table->avec  = NULL;
+     hash_table->bval  = NULL;
+     hash_table->width  = 0;
      hash_table->buckets = NULL;
      list_init(&hash_table->used_buckets);
      hash_table->a = NULL;
@@ -91,7 +151,7 @@ void l1lsh_init(HashTableL1 *hash_table)
 /**
  * @brief Initializes the randon number generator
  */
-void l1lsh_rng_init(unsigned long long seed)
+void lplsh_rng_init(unsigned long long seed)
 {
      init_genrand64(seed);
 }
@@ -106,18 +166,19 @@ void l1lsh_rng_init(unsigned long long seed)
  *
  * @return Hash table structure
  */
-HashTableL1 l1lsh_create(uint table_size, uint tuple_size, uint dim, uint max_value)
+HashTableLP lplsh_create(uint table_size, uint tuple_size, uint dim, double width)
 {
      uint i;
-     HashTableL1 hash_table;
+     HashTableLP hash_table;
 
      hash_table.table_size = table_size;
      hash_table.tuple_size = tuple_size; 
      hash_table.dim = dim;
-     hash_table.max_value = max_value; 
-     hash_table.sample_bits = (SampleBits *) malloc(tuple_size * sizeof(SampleBits)); 
-     hash_table.number_of_samples = (uint *) calloc(dim, sizeof(uint));    
-     hash_table.buckets = (BucketL1 *) calloc(table_size, sizeof(BucketL1));
+     hash_table.width = width;
+     
+     hash_table.avec = (double *) malloc(tuple_size * dim * sizeof(double));
+     hash_table.bval = (double *) malloc(tuple_size *  sizeof(double));
+     hash_table.buckets = (BucketLP *) calloc(table_size, sizeof(BucketLP));
      list_init(&hash_table.used_buckets);
 
      // generates array of random values for universal hashing
@@ -134,12 +195,12 @@ HashTableL1 l1lsh_create(uint table_size, uint tuple_size, uint dim, uint max_va
 /**
  * @brief Removes items stored in a bucket whose index is computed from a given vector
  *
- * @param list List to be removed
+ * @param vector Vector to be removed
  * @param hash_table Hash table structure
  */
-void l1lsh_erase_from_vector(List *list, HashTableL1 *hash_table)
+void lplsh_erase_from_vector(Vector *vector, HashTableLP *hash_table)
 {  
-     uint index = l1lsh_get_index(list, hash_table);
+     uint index = lplsh_get_index(vector, hash_table);
      list_destroy(&hash_table->buckets[index].items);
      hash_table->buckets[index].hash_value = 0;
      
@@ -155,7 +216,7 @@ void l1lsh_erase_from_vector(List *list, HashTableL1 *hash_table)
  * @param index Index of the bucket to be removed
  * @param hash_table Hash table structure
  */
-void l1lsh_erase_from_index(uint index, HashTableL1 *hash_table)
+void lplsh_erase_from_index(uint index, HashTableLP *hash_table)
 {  
      if (index >= 0 && index < hash_table->table_size){
           // destroy bucket
@@ -177,7 +238,7 @@ void l1lsh_erase_from_index(uint index, HashTableL1 *hash_table)
  *
  * @param hash_table Hash table structure
  */
-void l1lsh_clear_table(HashTableL1 *hash_table)
+void lplsh_clear_table(HashTableLP *hash_table)
 {  
      uint i;
 
@@ -195,117 +256,91 @@ void l1lsh_clear_table(HashTableL1 *hash_table)
  *
  * @param hash_table Hash table structure
  */
-void l1lsh_destroy(HashTableL1 *hash_table)
+void lplsh_destroy(HashTableLP *hash_table)
 {
-     free(hash_table->sample_bits);
-     free(hash_table->number_of_samples);
+     free(hash_table->avec);
+     free(hash_table->bval);
      free(hash_table->buckets);
      free(hash_table->a);
      free(hash_table->b);
      list_destroy(&hash_table->used_buckets);
-     l1lsh_init(hash_table);
+     lplsh_init(hash_table);
 }
 
 /**
- * @brief Picks the sample bits for LSH.
+ * @brief Generates a random values for LSH scheme.
  *
- * @param dim Dimension of the vectors to be hashed
- * @param max_value Largest value in any dimension
- * @param tuple_size Number of MinHash values per tuple
- * @param sample_bits Sample bits
+  * @param tuple_size Number of hash values per tuple
+ * @param dim Dimension of the input vectors
+ * @param width Width parameter for computing hash value
+ * @param avec Array of real numbers drawn from a p-stable distribution
+ * @param bval Random value from U(0, width)
  */
-
-void l1lsh_generate_sample_bits(uint dim, uint max_value, uint tuple_size, SampleBits *sample_bits,
-                                uint *number_of_samples)
+void lplsh_generate_random_values(uint tuple_size, uint dim, double width,
+                                  double *avec, double *bval,
+                                  double (*ps_dist)(void))
 {
-     uint i;
-     uint *usedbits = (uint *) calloc(dim * max_value, sizeof(uint));
-     
-     for(i = 0; i < tuple_size; i++) {
-          sample_bits[i].dim = genrand64_int64() % dim;
-          sample_bits[i].loc = genrand64_int64() % max_value;
-          uint bitnum = sample_bits[i].dim * max_value + sample_bits[i].loc;
-          while(usedbits[bitnum]){
-               sample_bits[i].dim = genrand64_int64() % dim;
-               sample_bits[i].loc = genrand64_int64() % max_value;
-               bitnum = sample_bits[i].dim * max_value + sample_bits[i].loc;
-          }
-          usedbits[bitnum] = 1;
-          number_of_samples[sample_bits[i].dim]++;
-	  
+     uint i, j;
+     for (i = 0; i < tuple_size; i++){
+          for (j = 0; j < dim; j++)
+               avec[i * dim + j] = ps_dist();
+          bval[i] = lplsh_rng_unif(0, width);
      }
-     qsort(sample_bits, tuple_size, sizeof(SampleBits), l1lsh_sample_bit_compare);	
-} 
-
-/**
- * @brief  Compares two samplebits according to their dimension and location
- *     	   (used as comparison function for the qsort function)
- * @param sb1 Sample bit 1
- * @param sb2 Sample bit 2
- * 
- * @return -1 if sb1 < sb2, 1 if sb1 > sb2 and 0 if sb1 = sb2
- */ 
-int l1lsh_sample_bit_compare(void const *a, void const *b)
-{
-     const SampleBits *sb1 = a;
-     const SampleBits *sb2 = b;
-     if(sb1->dim < sb2->dim) 
-          return -1;
-     else if (sb1->dim > sb2->dim) 
-          return 1;  
-     if(sb1->loc < sb2->loc) 
-          return -1;
-     else if(sb1->loc > sb2->loc) 
-          return 1;
-     return 0;
 }
 
 /**
  * @brief Computes the hash value of a positive-integer-valued vector according to 
  * 
  * @param vector d-dimensional Euclidian vector
- * @param sbits Location of the sample bits (hyperplanes) 
- *        in each dimension
- * @param numbits Number of sample bits (hyperplanes) for one dimension
+ * @param avec Array of real numbers drawn from a p-stable distribution
+ * @param bval Value Real number drawn from U(0, width)
  * 
- * @return The hash value of *vector (can be stored in multiple integers)
+ * @return The hash value of input vector
  */ 
-void l1lsh_compute_hash_value(List *list, HashTableL1 *hash_table,
-                              uint *hash_value, uint *index)
+ullong lplsh_compute_hash_value(Vector *vector, double *avec, double bval, double width)
 {
-     int low, mid, high, i, k, l, prev_l;
-     ullong temp_index = 0;
-     ullong temp_hv = 0;
-     uint *hv = (uint *) malloc(hash_table->dim * sizeof(uint));
+     uint i;
 
-     l = 0;
-     for(i = 0; i < hash_table->dim && l < hash_table->tuple_size; i++) { 
-          low = l;
-          prev_l = l;
-          l += hash_table->number_of_samples[i];
-          high = l - 1;
-          if(hash_table->sample_bits[low].loc > list->data[hash_table->sample_bits[low].dim].freq)
-               hv[i] = 0;
-          else if(hash_table->sample_bits[high].loc <= list->data[i].freq)
-               hv[i] = high - low + 1;
-          else{	
-               while((low + 1) < high){	
-                    mid = (low + high) / 2;
-                    if(hash_table->sample_bits[mid].loc <= list->data[i].freq)
-                         low = mid;
-                    else
-                         high = mid;
-               }						
-               hv[i] = low + 1 - prev_l; 
-          }
+     double dotp = 0;
+     for (i = 0; i < vector->size; i++) 
+          dotp += vector->data[i].value * avec[vector->data[i].dim];
+     printf("%lf\n",  dotp);
+     dotp += bval;
+     printf("%lf\n",  dotp);
+     printf("%lf\n",  dotp / width);
+     printf("%lf\n",  floor(dotp / width));
+     int hs = (int) floor(dotp / width);
+     printf("%d\n",  hs);
+     ullong hash_value = (ullong) hs;
 
-          temp_index += ((ullong) hash_table->a[i]) * hv[i];
-          temp_hv += ((ullong) hash_table->b[i]) * hv[i]; 
+     return hash_value;
+}
+
+/**
+ * @brief Universal hashing for getting a hash table index from the corresponding hash value tuple
+ *
+ * @param vector Vector to be hashed
+ * @param hash_table Hash table structure
+ * @param hash_value Hash value
+ * @param index Table index
+ */
+void lplsh_univhash(Vector *vector, HashTableLP *hash_table, uint *hash_value, uint *index)
+{
+     uint i;
+     ullong hv;
+     __uint128_t temp_index = 0;
+     __uint128_t temp_hv = 0;
+
+     // computes MinHash values
+     for (i = 0; i < hash_table->tuple_size; i++){
+          hv = lplsh_compute_hash_value(vector, &hash_table->avec[i * hash_table->dim], hash_table->bval[i], hash_table->width);
+          temp_index += ((ullong) hash_table->a[i]) * hv;
+          temp_hv += ((ullong) hash_table->b[i]) * hv; 
      }
 
      // computes 2nd-level hash value and index (universal hash functions)
-     *hash_value = (temp_hv % LARGEST_PRIME);   
-     *index = (temp_index % LARGEST_PRIME) % hash_table->table_size;
+     *hash_value = (temp_hv % LARGEST_PRIME64);   
+     *index = (temp_index % LARGEST_PRIME64) % hash_table->table_size;
 }
 
 /**
@@ -313,16 +348,16 @@ void l1lsh_compute_hash_value(List *list, HashTableL1 *hash_table,
  *        adressing collision resolution and linear probing.
  * @todo Add other probing strategies.
  *
- * @param list List to be hashed
+ * @param vector Vector to be hashed
  * @param hash_table Hash table structure
  *
- * @return - index of the hash table
+ * @return index of the hash table
  */ 
-uint l1lsh_get_index(List *list, HashTableL1 *hash_table)
+uint lplsh_get_index(Vector *vector, HashTableLP *hash_table)
 {
      uint checked_buckets, index, hash_value;
      
-     l1lsh_compute_hash_value(list, hash_table, &hash_value, &index);
+     lplsh_univhash(vector, hash_table, &hash_value, &index);
      if (hash_table->buckets[index].items.size != 0){ // examine buckets (open adressing)
           if (hash_table->buckets[index].hash_value != hash_value){
                checked_buckets = 1;
@@ -357,12 +392,14 @@ uint l1lsh_get_index(List *list, HashTableL1 *hash_table)
  * @param id ID of the list
  * @param hash_table Hash table
  */ 
-uint l1lsh_store_list(List *list, uint id, HashTableL1 *hash_table)
+uint lplsh_store_vector(Vector *vector, uint id, HashTableLP *hash_table)
 {
      uint index;
 
      // get index of the hash table
-     index = l1lsh_get_index(list, hash_table);
+     printf("\n Vector %d", id);
+     vector_print(vector);
+     index = lplsh_get_index(vector, hash_table);
      if (hash_table->buckets[index].items.size == 0){ // mark used bucket
           Item new_used_bucket = {index, 1};
           list_push(&hash_table->used_buckets, new_used_bucket);
@@ -382,13 +419,11 @@ uint l1lsh_store_list(List *list, uint id, HashTableL1 *hash_table)
  * @param hash_table Hash table
  * @param indices Indices of the used buckets
  */ 
-void l1lsh_store_listdb(ListDB *listdb, HashTableL1 *hash_table, uint *indices)
+void lplsh_store_vectordb(VectorDB *vectordb, HashTableLP *hash_table, uint *indices)
 {
      uint i;
      
-         
-     // hash all lists in the database
-     for (i = 0; i < listdb->size; i++)
-          if (listdb ->lists[i].size > 0)
-               indices[i] = l1lsh_store_list(&listdb->lists[i], i, hash_table);
+     // hash all vectors in the database
+     for (i = 0; i < vectordb->size; i++)
+          indices[i] = lplsh_store_vector(&vectordb->vectors[i], i, hash_table);
 }
