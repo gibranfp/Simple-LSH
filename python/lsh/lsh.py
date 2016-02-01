@@ -29,14 +29,20 @@ from scipy.sparse import csr_matrix
 import lsh_api as la
 
 def lsh_init(seed):
-    la.mh_rng_init(seed)
+    la.l1lsh_rng_init(seed)
 
-def lsh_load(filename):
+def lsh_load(filename, scheme):
     """
-    Loads a ListDB array from a given file
+    Loads a ListDB or VectorDB from a given file
     """
-    ldb = la.listdb_load_from_file(filename)
-    return LSH(ldb=ldb)
+    if scheme == 'l1lsh':
+        ldb = la.listdb_load_from_file(filename)
+        return L1LSH(ldb=ldb)
+    elif scheme == 'lplsh':
+        vdb = la.vectordb_load_from_file(filename)
+        return LPLSH(vdb=vdb)
+    else:
+        print 'Invalid LSH scheme'
 
 def csr_to_listdb(csr):
     """
@@ -52,7 +58,7 @@ def csr_to_listdb(csr):
     for i,j,v in itertools.izip(coo.row, coo.col, coo.data):
         ldb.push(int(i), int(j), int(round(v * factor)))
 
-    return LSH(ldb=ldb)
+    return L1LSH(ldb=ldb)
 
 def ndarray_to_listdb(arr):
     """
@@ -67,7 +73,18 @@ def ndarray_to_listdb(arr):
         for j,item in enumerate(row):
             if item != 0:
                 ldb.push(int(i), int(j), int(round(item * factor)))
-    return LSH(ldb=ldb)
+    return L1LSH(ldb=ldb)
+
+def ndarray_to_vectordb(arr):
+    """
+    Converts a numpy multidimensional array to a VectorDB structure
+    """
+    vdb = la.vectordb_create(arr.shape[0], arr.shape[1])
+    for i,row in enumerate(arr):
+        for j,value in enumerate(row):
+            if value != 0:
+                vdb.push(int(i), int(j), value)
+    return LPLSH(ldb=ldb)
 
 def centers_from_labels(data, labels):
     """
@@ -80,7 +97,7 @@ def centers_from_labels(data, labels):
 
     return ndarray_to_listdb(centers)
 
-class LSH:
+class L1LSH:
     """
     Interface class to Sampled LSH
     """
@@ -132,7 +149,7 @@ class LSH:
 
         la.listdb_apply_to_all(models, la.list_sort_by_frequency_back)
                 
-        return LSH(ldb=models)
+        return L1LSH(ldb=models)
 
     def cluster_sklearn(self, algorithm):
         """
@@ -202,21 +219,118 @@ class LSH:
 
         return arr
 
+class LPLSH:
+    """
+    Interface class to Sampled LSH
+    """
+    def __init__(self,size=0,dim=0,vdb=None):
+        """
+        Initializes class with VectorDB structure
+        """
+        if vdb:
+            self.vdb=vdb
+        else:
+            self.vdb = la.vectordb_create(size,dim)
+   
+    def push(self,vector):
+        """
+        Appends vector to a VectorDB structure
+        """
+        la.vectordb_push(self.vdb,topic)
+
+    def save(self,filename):
+        """
+        Saves VectorDB structure to file
+        """
+        la.vectordb_save_to_file(filename,self.vdb)
+
+    def show(self):
+        """
+        Prints VectorDB structure
+        """
+        la.vectordb_print(self.vdb)
+
+    def mine(self,tuple_size=8,num_tuples=100,norm='l1',width=3.0,table_size=2**19):
+        """
+        Mines co-occurring items from a database of lists using Sampled LSH
+        """
+        if norm == 'l1':
+            ldb=la.sampledlsh_lpmine(self.vdb,tuple_size,num_tuples,width,table_size, la.lplsh_rng_cauchy)
+        else:
+            ldb=la.sampledlsh_lpmine(self.vdb,tuple_size,num_tuples,width,table_size, la.lplsh_rng_gaussian)
+
+        return L1LSH(ldb=ldb)
+
+    def size(self):
+        """
+        Returns the size of the ListDB structure
+        """
+        return self.vdb.size
+
+    def dim(self):
+        """
+        Returns the dimensionality of the ListDB structure
+        """
+        return self.vdb.dim
+
+    def destroy(self):
+        """
+        Destroys the ListDB structure
+        """
+        la.vectordb_destroy(self.vdb)
+
+    def tocsr(self):
+        """
+        Returns the ListDB structure as a Compressed Sparse Row (CSR) matrix
+        """
+        indptr = [0]
+        indices = []
+        data = []
+        for l in self.vdb:
+            for i in l:
+                indices.append(i.dim)
+                data.append(i.value)
+                indptr.append(len(indices))
+
+        return csr_matrix((data, indices, indptr), dtype=float)
+
+    def toarray(self):
+        """
+        Converts a vectordb structure to a numpy multidimensional array
+        """
+        arr = np.zeros((self.size(), self.dim()))
+        for i, l in enumerate(self.vdb):
+            for j in l:
+                arr[i, j.dim] = j.value
+
+        return arr
+
 if __name__ == "__main__":
     import argparse
     p = argparse.ArgumentParser("Mines")
+
+    p.add_argument("-s","--scheme",default='lplsh',type=str,
+        action="store", dest='s',help="LSH scheme")
+    p.add_argument("-n","--norm",default='l2',type=str,
+        action="store", dest='n',help="Norm to be used")
     p.add_argument("-r","--tuple_size",default=4,type=int,
         action="store", dest='r',help="Size of the tupple")
     p.add_argument("-l","--number_tuples",default=10,type=int,
         action="store", dest='l',help="Number of the tupple")
+    p.add_argument("-w","--width",default=3.0, type=float,
+        action="store", dest='w',help="Width")
     p.add_argument("--output",default=None,type=str,
         action="store", dest='output',help="Filename to save mined model")
 
     opts = p.parse_args()
 
-    s=lsh_load(opts.file)
+    s=lsh_load(opts.file, opts.s)
     print "Size of loaded file:",s.size()
-    m=s.mine(opts.r,opts.l)
+    if opts.s == 'lplsh':
+        m=s.mine(opts.r,opts.l,opts.n,opts.w)
+    else:
+        m=s.mine(opts.r,opts.l)
+
     print "Size of original mined topics:",m.size()
     m.cutoff(min=opts.min)
     print "Size of cutted off mined topics:",m.size()

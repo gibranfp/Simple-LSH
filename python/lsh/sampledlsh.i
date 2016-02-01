@@ -2,6 +2,8 @@
 %module sampledlsh
 %{
 #include "listdb.h"
+#include "vectordb.h"
+#include "lplsh.h"
 #include "sampledlsh.h"
 
 #define DEF_TABLE_SIZE 524288

@@ -111,10 +111,10 @@ Dim *vector_max_value(Vector *vector)
  *
  * @return Sum of the input vector
  */
-uint vector_sum_value(Vector *vector)
+double vector_sum_value(Vector *vector)
 {
      uint i;
-     uint sum = 0;
+     double sum = 0.0;
 
      for (i = 0; i < vector->size; i++)
           sum += vector->data[i].value;

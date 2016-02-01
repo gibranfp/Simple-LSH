@@ -28,7 +28,7 @@
  * @Brief Generates normally distributed numbers using the Box-Muller transform
  *
  */
-double lplsh_rng_gaussian()
+double lplsh_rng_gaussian(void)
 {
      double u1, u2;
 
@@ -45,7 +45,7 @@ double lplsh_rng_gaussian()
  * @Brief Generates Cauchy distributed numbers from the ratio of 2 normally distributed numbers
  *        (ratio distribution).
  */
-double lplsh_rng_cauchy()
+double lplsh_rng_cauchy(void)
 {
      double a, b;
 
@@ -304,16 +304,11 @@ ullong lplsh_compute_hash_value(Vector *vector, double *avec, double bval, doubl
      double dotp = 0;
      for (i = 0; i < vector->size; i++) 
           dotp += vector->data[i].value * avec[vector->data[i].dim];
-     printf("%lf\n",  dotp);
      dotp += bval;
-     printf("%lf\n",  dotp);
-     printf("%lf\n",  dotp / width);
-     printf("%lf\n",  floor(dotp / width));
-     int hs = (int) floor(dotp / width);
-     printf("%d\n",  hs);
-     ullong hash_value = (ullong) hs;
 
-     return hash_value;
+     int hash_value = (int) floor(dotp / width);
+
+     return (ullong) hash_value;
 }
 
 /**
@@ -397,8 +392,6 @@ uint lplsh_store_vector(Vector *vector, uint id, HashTableLP *hash_table)
      uint index;
 
      // get index of the hash table
-     printf("\n Vector %d", id);
-     vector_print(vector);
      index = lplsh_get_index(vector, hash_table);
      if (hash_table->buckets[index].items.size == 0){ // mark used bucket
           Item new_used_bucket = {index, 1};

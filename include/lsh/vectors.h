@@ -37,9 +37,8 @@ typedef struct Vector {
 void vector_init(Vector *);
 Vector vector_create(uint);
 void vector_destroy(Vector *);
-Dim *vector_min_value(Vector *);
 Dim *vector_max_value(Vector *);
-uint vector_sum_value(Vector *);
+double vector_sum_value(Vector *);
 void vector_print(Vector *);
 void vector_print_multi(Vector *, List *);
 void vector_print_range(Vector *, uint, uint);

@@ -45,8 +45,6 @@ void vectordb_pop_multi(VectorDB *, uint);
 void vectordb_pop_until(VectorDB *, uint);
 void vectordb_delete_position(VectorDB *, uint);
 void vectordb_delete_range(VectorDB *, uint, uint);
-void vectordb_delete_smallest(VectorDB *, uint);
-void vectordb_delete_largest(VectorDB *, uint);
 void vectordb_insert(VectorDB *, Vector *, uint);
 void vectordb_append(VectorDB *, VectorDB *);
 VectorDB vectordb_load_from_file(char *);

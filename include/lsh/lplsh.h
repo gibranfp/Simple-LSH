@@ -48,8 +48,8 @@ typedef struct HashIndexLP {
 } HashIndexLP;
 
 /************************ Function prototypes ************************/
-double lplsh_rng_gaussian();
-double lplsh_rng_cauchy();
+double lplsh_rng_gaussian(void);
+double lplsh_rng_cauchy(void);
 double lplsh_rng_unif(double, double);
 void lplsh_print_head(HashTableLP *);
 void lplsh_print_table(HashTableLP *);
